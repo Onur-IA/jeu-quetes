@@ -5,7 +5,7 @@
 // par le moteur local (localStorage et IndexedDB).
 // Aucune requête ne part vers l'extérieur.
 
-const VERSION = "v6-1";
+const VERSION = "v7-1";
 const CACHE = "jeu-quetes-coquille-" + VERSION;
 const PREFIXE = "jeu-quetes-coquille-";
 

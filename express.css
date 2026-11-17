@@ -56,7 +56,7 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid 
 .x-xp.monte i { animation: lueur 0.8s ease-out; }
 @keyframes lueur { 0% { background: var(--creme); } 100% { background: var(--lueur); } }
 .x-outils { display: flex; gap: 8px; }
-.x-rond { flex: 1; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; background: var(--ardoise); color: var(--creme); border: 2px solid var(--encre); box-shadow: inset 0 -3px 0 var(--nuit); font-size: 14px; font-weight: 600; text-decoration: none; }
+.x-rond { flex: 1; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; background: var(--ardoise); color: var(--creme); border: 2px solid var(--encre); box-shadow: inset 0 -3px 0 var(--nuit); font-size: 14px; font-weight: 600; text-decoration: none; }
 .x-rond[aria-pressed="true"] { background: var(--bleu); }
 #x-pastille { width: 10px; height: 10px; background: var(--vert-clair); border: 2px solid var(--encre); }
 #x-pastille.attente { background: var(--or); }
@@ -74,7 +74,7 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid 
 @keyframes saut { 0% { transform: scale(0.6); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
 #x-bandeau { margin: 8px 0; padding: 10px 12px; background: var(--or-clair); color: var(--encre); border: 2px solid var(--encre); font-size: 14px; }
-#x-bandeau button { margin: 6px 8px 0 0; min-height: 34px; padding: 0 12px; background: var(--creme); border: 2px solid var(--encre); color: var(--encre); font-weight: 600; }
+#x-bandeau button { margin: 6px 8px 0 0; min-height: 44px; padding: 0 12px; background: var(--creme); border: 2px solid var(--encre); color: var(--encre); font-weight: 600; }
 
 /* ---------- les quêtes ---------- */
 #x-liste h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ciel); margin: 18px 2px 8px; display: flex; justify-content: space-between; }
@@ -122,7 +122,7 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid 
 /* ---------- feuilles (degrés, synchro) ---------- */
 .x-feuille { position: fixed; inset: 0; z-index: 47; display: flex; align-items: flex-end; justify-content: center; background: rgba(29, 42, 68, 0.72); animation: voile 0.2s; }
 @keyframes voile { from { opacity: 0; } }
-.x-feuille > div { width: 100%; max-width: 560px; max-height: 86vh; overflow: auto; padding: 18px calc(var(--droite) + 16px) calc(var(--bas) + 18px) calc(var(--gauche) + 16px); background: var(--creme); color: var(--encre); border-top: 4px solid var(--encre); animation: monte 0.25s cubic-bezier(.2, .9, .3, 1.1); -webkit-user-select: text; user-select: text; }
+.x-feuille > div { width: 100%; max-width: 560px; max-height: calc(100dvh - var(--haut) - 4px); overflow: auto; padding: calc(var(--haut) + 10px) calc(var(--droite) + 16px) calc(var(--bas) + 18px) calc(var(--gauche) + 16px); background: var(--creme); color: var(--encre); border-top: 4px solid var(--encre); animation: monte 0.25s cubic-bezier(.2, .9, .3, 1.1); -webkit-user-select: text; user-select: text; }
 @keyframes monte { from { transform: translateY(40px); opacity: 0.4; } }
 .x-feuille h3 { margin: 0 0 10px; font-size: 18px; }
 .x-feuille p { margin: 8px 0; font-size: 14px; }
@@ -138,7 +138,7 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid 
 .x-etat dd { margin: 0; }
 
 /* ---------- message bref ---------- */
-#x-toast { position: fixed; z-index: 50; left: 50%; bottom: calc(var(--bas) + 84px); transform: translateX(-50%); max-width: calc(100% - 28px); display: flex; gap: 12px; align-items: center; padding: 10px 14px; background: var(--encre); color: var(--creme); border: 2px solid var(--ardoise); font-size: 14px; animation: monte 0.2s; }
+#x-toast { pointer-events: none; position: fixed; z-index: 50; left: 50%; top: calc(var(--haut) + 12px); bottom: auto; transform: translateX(-50%); max-width: calc(100% - 28px); display: flex; gap: 12px; align-items: center; padding: 10px 14px; background: var(--encre); color: var(--creme); border: 2px solid var(--ardoise); font-size: 14px; animation: monte 0.2s; }
 #x-toast button { min-height: 34px; padding: 0 10px; background: var(--or); color: var(--encre); border: 2px solid var(--encre); font-weight: 700; }
 
 /* ---------- fête ---------- */
@@ -180,3 +180,52 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid 
 body:has(.x-feuille:not([hidden])) #x-ajout { visibility: hidden; }
 .x-feuille { z-index: 60; }
 .x-feuille > div { background: #FDFBF7; color: #2B2B2B; box-shadow: 0 -8px 24px rgba(29, 42, 68, 0.45); }
+
+.x-fete, .x-niveau { z-index: 70; pointer-events: auto; }
+.x-fete > div, .x-niveau > div { pointer-events: auto; max-width: 92vw; padding: 22px 18px calc(var(--bas) + 22px); background: #FDFBF7; color: #2B2B2B; border: 4px solid #2B2B2B; text-align: center; }
+.x-fete .x-btn, .x-niveau .x-btn { min-height: 48px; min-width: 44px; margin-top: 12px; padding: 0 18px; background: var(--terra); color: var(--creme); border: 3px solid var(--encre); font-weight: 700; }
+.x-niveau b { display: block; font-size: 28px; color: var(--nuit); }
+.x-niveau .x-rang-fete { display: inline-block; margin: 8px 0; width: 64px; height: 64px; line-height: 58px; background: var(--ardoise); color: var(--or); border: 3px solid var(--encre); font-size: 32px; font-weight: 800; }
+
+#x-maison { margin-top: 8px; }
+.x-maison { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 8px 10px; background: var(--ardoise); color: var(--creme); border: 3px solid var(--encre); text-align: left; }
+.x-maison-dessin { display: flex; flex-direction: column-reverse; align-items: center; width: 52px; flex: none; gap: 2px; }
+.x-maison-dessin i { display: block; background: var(--sable); border: 2px solid var(--encre); }
+.x-maison-dessin i.n0 { width: 28px; height: 8px; background: var(--pierre); }
+.x-maison-dessin i.n1 { width: 32px; height: 10px; background: var(--creme2); }
+.x-maison-dessin i.n2 { width: 36px; height: 10px; background: var(--peche); }
+.x-maison-dessin i.n3 { width: 40px; height: 12px; background: var(--or-clair); }
+.x-maison-dessin i.n4 { width: 44px; height: 12px; background: var(--or); }
+.x-maison-dessin i.n5 { width: 48px; height: 14px; background: var(--terra); }
+.x-maison-dessin i.n6 { width: 52px; height: 16px; background: var(--lueur); }
+.x-maison-texte { flex: 1; min-width: 0; }
+.x-maison-texte b { display: block; font-size: 15px; }
+.x-maison-texte small { display: block; color: var(--ciel); font-size: 12px; font-weight: 500; }
+
+.x-boss { display: block; width: 100%; min-height: 64px; margin: 0 0 12px; padding: 10px 12px; background: var(--encre); color: var(--creme); border: 3px solid var(--or); text-align: left; }
+.x-boss.vaincu { background: var(--vert-fonce); border-color: var(--vert-clair); }
+.x-boss-titre { display: block; font-size: 14px; }
+.x-boss-titre b { margin-right: 6px; color: var(--or); }
+.x-boss-barre { display: block; height: 10px; margin: 8px 0 4px; background: var(--nuit); border: 2px solid var(--ardoise); overflow: hidden; }
+.x-boss-barre i { display: block; height: 100%; background: var(--terra); width: 0; transition: width 0.4s ease-out; }
+.x-boss small { color: var(--ciel); font-size: 12px; }
+
+.x-feuille textarea, .x-feuille input[type="text"], .x-feuille input[type="number"] {
+  display: block; width: 100%; min-height: 46px; margin: 8px 0 12px; padding: 10px 12px;
+  font: inherit; font-size: 16px; background: var(--creme2); color: var(--encre); border: 3px solid var(--encre);
+  -webkit-user-select: text; user-select: text;
+}
+.x-feuille textarea { min-height: 160px; resize: vertical; }
+.x-fichier { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip: rect(0 0 0 0); }
+label.x-btn { position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; }
+.x-btn, .x-feuille .x-btn { min-height: 48px; }
+.x-recompense { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+.x-recompense span { flex: 1; }
+.x-recompense button { min-height: 44px; min-width: 44px; padding: 0 12px; }
+
+body:has(.x-fete), body:has(.x-niveau) { }
+body:has(.x-fete) #x-ajout, body:has(.x-niveau) #x-ajout { visibility: hidden; }
+
+.x-fermer-haut { position: sticky; top: 0; float: right; z-index: 3; min-height: 44px; min-width: 44px; margin: 0 0 8px 8px; padding: 0 12px; background: var(--creme2); color: var(--encre); border: 3px solid var(--encre); font-weight: 700; }
+.x-pied { position: sticky; bottom: 0; z-index: 3; margin: 12px 0 0; padding: 8px 0 calc(var(--bas) + 8px); background: #FDFBF7; }
+.x-pied .x-btn { width: 100%; }

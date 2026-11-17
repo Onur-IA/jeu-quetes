@@ -1,4 +1,4 @@
-/* Jeu de quêtes, moteur local (version 6). Généré, ne pas éditer à la main. */
+/* Jeu de quêtes, moteur local (version 7). Généré, ne pas éditer à la main. */
 (function (racine) {
   "use strict";
 
@@ -154,19 +154,39 @@
   var IDB_NOM = "jeu-quetes-v6";
   var IDB_STORE = "disque";
 
+  var disqueSauveLe = 0;
+
   function snapshot() {
     var o = {};
     Object.keys(disque).forEach(function (k) { o[k] = disque[k]; });
     return o;
   }
 
-  function appliquerSnapshot(o) {
+  function embalage() {
+    disqueSauveLe = Date.now();
+    return { v: 2, sauve_le: disqueSauveLe, disque: snapshot() };
+  }
+
+  function deballer(o) {
+    if (o && typeof o === "object" && o.v === 2 && o.disque && typeof o.disque === "object") {
+      return { sauve_le: typeof o.sauve_le === "number" ? o.sauve_le : 0, disque: o.disque };
+    }
+    return { sauve_le: 0, disque: o && typeof o === "object" ? o : null };
+  }
+
+  function appliquerSnapshot(o, options) {
+    var lu = deballer(o);
+    if (!lu.disque) return;
+    // Une copie plus ancienne (IndexedDB en retard) ne doit pas écraser la plus récente (localStorage).
+    if (!(options && options.forcer) && disqueSauveLe && lu.sauve_le && lu.sauve_le < disqueSauveLe) return;
+    if (!(options && options.forcer) && disqueSauveLe && !lu.sauve_le && Object.keys(disque).length) return;
     Object.keys(disque).forEach(function (k) { delete disque[k]; });
-    if (o && typeof o === "object") Object.keys(o).forEach(function (k) { disque[k] = o[k]; });
+    Object.keys(lu.disque).forEach(function (k) { disque[k] = lu.disque[k]; });
+    if (lu.sauve_le) disqueSauveLe = lu.sauve_le;
   }
 
   function persisterLocal() {
-    try { racine.localStorage.setItem(CLE_LS, JSON.stringify(snapshot())); } catch (e) {}
+    try { racine.localStorage.setItem(CLE_LS, JSON.stringify(embalage())); } catch (e) {}
   }
 
   function persisterIdb() {
@@ -177,7 +197,7 @@
       req.onsuccess = function () {
         var db = req.result;
         var tx = db.transaction(IDB_STORE, "readwrite");
-        tx.objectStore(IDB_STORE).put(snapshot(), "racine");
+        tx.objectStore(IDB_STORE).put(embalage(), "racine");
         tx.oncomplete = function () { db.close(); };
         tx.onerror = function () { db.close(); };
       };
@@ -189,6 +209,16 @@
     persisterLocal();
     if (persisteMinuteur) racine.clearTimeout(persisteMinuteur);
     persisteMinuteur = racine.setTimeout(function () { persisteMinuteur = null; persisterIdb(); }, 80);
+  }
+  if (racine.addEventListener) {
+    racine.addEventListener("pagehide", function () { if (persisteMinuteur) { racine.clearTimeout(persisteMinuteur); persisteMinuteur = null; } persisterLocal(); persisterIdb(); });
+    racine.addEventListener("visibilitychange", function () {
+      if (racine.document && racine.document.visibilityState === "hidden") {
+        if (persisteMinuteur) { racine.clearTimeout(persisteMinuteur); persisteMinuteur = null; }
+        persisterLocal();
+        persisterIdb();
+      }
+    });
   }
 
   function restaurerSync() {
@@ -389,7 +419,7 @@
     module.exports = { lire: function () { return { collegues: [], sessions: 0 }; }, lireSansCache: function () { return { collegues: [], sessions: 0 }; }, libelleAction: function () { return ""; }, extraire: function () { return null; }, viderCache: function () {} };
   });
 
-  var CONFIG_PUBLIQUE = {"version":6,"coffre":"non","coffre_candidats":[],"chemin_phases":"","port":80,"reseau_local":false,"https":false,"fuseau":"Europe/Paris","rafraichissement_s":30,"son":true,"joueur":"","enseigne":"Mon enseigne","monnaie":"€","objectif_mensuel":1000,"jalons_mensuels":"auto","periode":"mois_civil","sources_encaissement":["Ventes","Abonnements","Ateliers","Livre","Autre"],"points":{"ligne":10,"priorite":15,"degres":[1,2,3],"degre_defaut":2,"multiplicateur_vente":2,"bonus_jour":25,"geste":5},"degres_defaut":["Commencé pour de bon","Fait, comme prévu","Fait, et mieux que prévu"],"quetes_visibles":5,"plafond":{"par_jour":6,"plein":4,"taux_reduit":50},"contrat":{"actif":true,"sur":{"quetes":3,"gain":30},"ambitieux":{"quetes":2,"mise":20,"gain":80,"heure_limite":"12:00","colis":true}},"retour":{"jours":3,"bonus":20},"arrosage":{"bonus_pourcent":20,"duree_h":12},"but_equipe":{"libelle":"","crans":10,"par_cran":3,"par_quete":1,"par_specialite":1,"par_session":1,"sessions_max_par_jour":3,"recompense":60},"dimanche":{"jour":7,"recompense":40},"niveaux":{"seuils":[0,60,150,300,500,800,1200,1700,2400,3200],"noms":["Locataire","Habitué","Artisan","Bâtisseur","Chef d'atelier","Maître d'œuvre","Architecte","Éditeur","Figure du quartier","Légende de l'immeuble"]},"deblocages":{"actif":true,"contrat":2,"boutique":2,"equipe":3,"argent":4,"carte":4,"arrosage":5,"trophees":5,"etat":5},"types":{"admin":{"nom":"Administratif","mode":"payee","mots":["facture","factures","impôts","urssaf","banque","déclaration","contrat","papiers","comptes","compta","assurance","dossier","formulaire","payer","rendez-vous"]},"vente":{"nom":"Vente","mode":"payee","mots":[]},"creation":{"nom":"Création","mode":"racontee","mots":["écrire","rédiger","dessiner","enregistrer","tourner","édition","éditions","brouillon","chapitre","vidéo","leçon","maquette","peindre","composer","publier","monter"]},"relations":{"nom":"Relations","mode":"racontee","mots":["appeler","déjeuner","dîner","remercier","anniversaire","famille","ami","amie","amis","nouvelles","parents","inviter","voir"]},"sante":{"nom":"Santé","mode":"racontee","mots":["sport","marcher","marche","courir","course","dormir","méditer","médecin","dentiste","étirements","repos","yoga","natation","vélo","cuisiner"]}},"type_defaut":"admin","categories_note":{"Deep Focus":"creation","Créatif":"creation","Admin":"admin","Autre":""},"mots_vente":["offre","offres","relance","relances","relancer","prospect","prospects","message à","vente","ventes","inscription","inscriptions","liste d'attente","page de vente","abonné","abonnés","proposer","proposition","devis","client","clients","vendre"],"mots_newsletter":["édition","éditions","newsletter","newsletters","abonné","abonnés","Substack"],"lecteurs_par_quete":3,"temoignages":[],"lieux":{"studio":{"nom":"Le studio sous les toits","sous_titre":"Un ordinateur, une idée."},"coworking":{"nom":"Le poste en coworking","sous_titre":"Un premier résultat. Tu sors de chez toi."},"atelier":{"nom":"L'atelier","sous_titre":"Ton nom sur la porte."},"bureaux":{"nom":"Les grands bureaux","sous_titre":"Deux étages vitrés, une équipe."},"maison-edition":{"nom":"La maison d'édition","sous_titre":"Tout l'immeuble. Tes livres en vitrine."}},"agents":{"plume":{"nom":"Plume","role":"écriture","specialite":"creation"},"boussole":{"nom":"Boussole","role":"vente","specialite":"vente"},"archive":{"nom":"Archive","role":"administratif","specialite":"admin"},"croquis":{"nom":"Croquis","role":"création","specialite":"creation"},"timbre":{"nom":"Timbre","role":"liens et messages","specialite":"relations"},"relais":{"nom":"Relais","role":"forme et santé","specialite":"sante"},"reliure":{"nom":"Reliure","role":"édition","specialite":"creation"},"marge":{"nom":"Marge","role":"relecture","specialite":"admin"}},"caps":[{"id":"cap1","lieu":"coworking","premier":true},{"id":"cap2","lieu":"atelier","part":0.33},{"id":"cap3","lieu":"bureaux","part":1},{"id":"cap4","lieu":"maison-edition","part":1.67}],"caps_effort":[{"id":"eff1","piece":"studio/etagere","compteur":"quetes","seuil":5},{"id":"eff2","piece":"studio/micro","compteur":"contrats","seuil":3},{"id":"eff3","piece":"coworking/cabine","compteur":"vente","seuil":5},{"id":"eff4","piece":"coworking/objectifs","compteur":"semaines","seuil":2},{"id":"eff5","piece":"atelier/studio-son","compteur":"creation","seuil":10},{"id":"eff6","piece":"bureaux/salle-reunion","compteur":"vente","seuil":10},{"id":"eff7","piece":"bureaux/studio-video","compteur":"confiees","seuil":15},{"id":"eff8","piece":"maison-edition/grande-bibliotheque","compteur":"quetes","seuil":100},{"id":"eff9","piece":"maison-edition/salle-lecture","compteur":"relations","seuil":20},{"id":"eff10","piece":"maison-edition/presse","compteur":"contrats","seuil":15},{"id":"eff11","piece":"maison-edition/enseigne","compteur":"semaines","seuil":8}],"collegues":{"actif":false,"racine":"","exclure":"france-ia|franceia|france ia|france_ia","seuil_actif_s":120,"seuil_present_s":600,"nom":"titre","max":6},"systeme":{"actif":true,"xp":{"par_quete":20,"par_habitude":5,"par_quotidienne":10,"base_niveau":100,"pas_niveau":40},"plafonds":{"quetes_pleines":8,"taux_reduit":25,"habitude_par_jour":3,"etapes_par_jour":2},"points_par_niveau":3,"rangs":{"E":1,"D":5,"C":10,"B":18,"A":28,"S":40},"noms_stats":{"force":"Force","endurance":"Endurance","intelligence":"Intelligence","charisme":"Charisme","creativite":"Créativité"},"stats_par_type":{"admin":"endurance","vente":"intelligence","creation":"creativite","relations":"charisme","sante":"force"},"pratique_par_point":5,"pv":{"base":50,"par_force":2,"degats_quotidienne":8,"degats_habitude":3,"soin_quete":2},"or":{"par_quete":5,"par_habitude":2,"par_quotidienne":3},"butin":{"chance":25},"defi":{"quetes":3,"or":15,"butin":true},"penalite":{"actif":true,"quetes":2,"bonus_sortie":15},"quotidiennes":{"graces_par_semaine":1},"ombres":{"serie":14,"bonus":2},"donjon":{"pv_petit":100,"pv_moyen":250,"pv_grand":600,"degats":10,"xp":150,"or":80},"studio":{"prix_embauche":60,"places":3,"production_h_max":24,"recherche_par_quete":1},"saison":{"jours":90,"niveau_prestige":10,"bonus_prestige":10},"recompenses":[{"texte":"Un café en terrasse","prix":30},{"texte":"Un épisode de ta série","prix":40},{"texte":"Une heure de jeu","prix":60},{"texte":"Un bon restaurant","prix":200}]},"energie":{"actif":true,"demander_le_matin":true,"cout_defaut":2,"niveaux":[{"id":"plat","titre":"À plat","cout_max":1,"aide":"Juste les petites quêtes, sans te forcer."},{"id":"calme","titre":"Calme","cout_max":2,"aide":"Les petites, et une ou deux un peu plus longues."},{"id":"bien","titre":"Bien","cout_max":3,"aide":"Le rythme habituel."},{"id":"forme","titre":"En forme","cout_max":4,"aide":"Tu peux viser plus grand."},{"id":"elan","titre":"Plein d'élan","cout_max":5,"aide":"Les grosses quêtes d'abord."}]}};
+  var CONFIG_PUBLIQUE = {"version":7,"coffre":"non","coffre_candidats":[],"chemin_phases":"","port":80,"reseau_local":false,"https":false,"fuseau":"Europe/Paris","rafraichissement_s":30,"son":true,"joueur":"","enseigne":"Mon enseigne","monnaie":"€","objectif_mensuel":1000,"jalons_mensuels":"auto","periode":"mois_civil","sources_encaissement":["Ventes","Abonnements","Ateliers","Livre","Autre"],"points":{"ligne":10,"priorite":15,"degres":[1,2,3],"degre_defaut":2,"multiplicateur_vente":2,"bonus_jour":25,"geste":5},"degres_defaut":["Commencé pour de bon","Fait, comme prévu","Fait, et mieux que prévu"],"quetes_visibles":5,"plafond":{"par_jour":6,"plein":4,"taux_reduit":50},"contrat":{"actif":true,"sur":{"quetes":3,"gain":30},"ambitieux":{"quetes":2,"mise":20,"gain":80,"heure_limite":"12:00","colis":true}},"retour":{"jours":3,"bonus":20},"arrosage":{"bonus_pourcent":20,"duree_h":12},"but_equipe":{"libelle":"","crans":10,"par_cran":3,"par_quete":1,"par_specialite":1,"par_session":1,"sessions_max_par_jour":3,"recompense":60},"dimanche":{"jour":7,"recompense":40},"niveaux":{"seuils":[0,60,150,300,500,800,1200,1700,2400,3200],"noms":["Locataire","Habitué","Artisan","Bâtisseur","Chef d'atelier","Maître d'œuvre","Architecte","Éditeur","Figure du quartier","Légende de l'immeuble"]},"deblocages":{"actif":true,"contrat":2,"boutique":2,"equipe":3,"argent":4,"carte":4,"arrosage":5,"trophees":5,"etat":5},"types":{"admin":{"nom":"Administratif","mode":"payee","mots":["facture","factures","impôts","urssaf","banque","déclaration","contrat","papiers","comptes","compta","assurance","dossier","formulaire","payer","rendez-vous"]},"vente":{"nom":"Vente","mode":"payee","mots":[]},"creation":{"nom":"Création","mode":"racontee","mots":["écrire","rédiger","dessiner","enregistrer","tourner","édition","éditions","brouillon","chapitre","vidéo","leçon","maquette","peindre","composer","publier","monter"]},"relations":{"nom":"Relations","mode":"racontee","mots":["appeler","déjeuner","dîner","remercier","anniversaire","famille","ami","amie","amis","nouvelles","parents","inviter","voir"]},"sante":{"nom":"Santé","mode":"racontee","mots":["sport","marcher","marche","courir","course","dormir","méditer","médecin","dentiste","étirements","repos","yoga","natation","vélo","cuisiner"]}},"type_defaut":"admin","categories_note":{"Deep Focus":"creation","Créatif":"creation","Admin":"admin","Autre":""},"mots_vente":["offre","offres","relance","relances","relancer","prospect","prospects","message à","vente","ventes","inscription","inscriptions","liste d'attente","page de vente","abonné","abonnés","proposer","proposition","devis","client","clients","vendre"],"mots_newsletter":["édition","éditions","newsletter","newsletters","abonné","abonnés","Substack"],"lecteurs_par_quete":3,"temoignages":[],"lieux":{"studio":{"nom":"Le studio sous les toits","sous_titre":"Un ordinateur, une idée."},"coworking":{"nom":"Le poste en coworking","sous_titre":"Un premier résultat. Tu sors de chez toi."},"atelier":{"nom":"L'atelier","sous_titre":"Ton nom sur la porte."},"bureaux":{"nom":"Les grands bureaux","sous_titre":"Deux étages vitrés, une équipe."},"maison-edition":{"nom":"La maison d'édition","sous_titre":"Tout l'immeuble. Tes livres en vitrine."}},"agents":{"plume":{"nom":"Plume","role":"écriture","specialite":"creation"},"boussole":{"nom":"Boussole","role":"vente","specialite":"vente"},"archive":{"nom":"Archive","role":"administratif","specialite":"admin"},"croquis":{"nom":"Croquis","role":"création","specialite":"creation"},"timbre":{"nom":"Timbre","role":"liens et messages","specialite":"relations"},"relais":{"nom":"Relais","role":"forme et santé","specialite":"sante"},"reliure":{"nom":"Reliure","role":"édition","specialite":"creation"},"marge":{"nom":"Marge","role":"relecture","specialite":"admin"}},"caps":[{"id":"cap1","lieu":"coworking","premier":true},{"id":"cap2","lieu":"atelier","part":0.33},{"id":"cap3","lieu":"bureaux","part":1},{"id":"cap4","lieu":"maison-edition","part":1.67}],"caps_effort":[{"id":"eff1","piece":"studio/etagere","compteur":"quetes","seuil":5},{"id":"eff2","piece":"studio/micro","compteur":"contrats","seuil":3},{"id":"eff3","piece":"coworking/cabine","compteur":"vente","seuil":5},{"id":"eff4","piece":"coworking/objectifs","compteur":"semaines","seuil":2},{"id":"eff5","piece":"atelier/studio-son","compteur":"creation","seuil":10},{"id":"eff6","piece":"bureaux/salle-reunion","compteur":"vente","seuil":10},{"id":"eff7","piece":"bureaux/studio-video","compteur":"confiees","seuil":15},{"id":"eff8","piece":"maison-edition/grande-bibliotheque","compteur":"quetes","seuil":100},{"id":"eff9","piece":"maison-edition/salle-lecture","compteur":"relations","seuil":20},{"id":"eff10","piece":"maison-edition/presse","compteur":"contrats","seuil":15},{"id":"eff11","piece":"maison-edition/enseigne","compteur":"semaines","seuil":8}],"collegues":{"actif":false,"racine":"","exclure":"france-ia|franceia|france ia|france_ia","seuil_actif_s":120,"seuil_present_s":600,"nom":"titre","max":6},"systeme":{"actif":true,"xp":{"par_quete":20,"par_habitude":5,"par_quotidienne":10,"base_niveau":100,"pas_niveau":40},"plafonds":{"quetes_pleines":8,"taux_reduit":25,"habitude_par_jour":3,"etapes_par_jour":2},"points_par_niveau":3,"rangs":{"E":1,"D":5,"C":10,"B":18,"A":28,"S":40},"noms_stats":{"force":"Force","endurance":"Endurance","intelligence":"Intelligence","charisme":"Charisme","creativite":"Créativité"},"stats_par_type":{"admin":"endurance","vente":"intelligence","creation":"creativite","relations":"charisme","sante":"force"},"pratique_par_point":5,"pv":{"base":50,"par_force":2,"degats_quotidienne":8,"degats_habitude":3,"soin_quete":2},"or":{"par_quete":5,"par_habitude":2,"par_quotidienne":3},"butin":{"chance":25},"defi":{"quetes":3,"or":15,"butin":true},"penalite":{"actif":true,"quetes":2,"bonus_sortie":15},"quotidiennes":{"graces_par_semaine":1},"ombres":{"serie":14,"bonus":2},"donjon":{"pv_petit":100,"pv_moyen":250,"pv_grand":600,"degats":10,"xp":150,"or":80},"studio":{"prix_embauche":60,"places":3,"production_h_max":24,"recherche_par_quete":1},"saison":{"jours":90,"niveau_prestige":10,"bonus_prestige":10},"recompenses":[{"texte":"Un café en terrasse","prix":30},{"texte":"Un épisode de ta série","prix":40},{"texte":"Une heure de jeu","prix":60},{"texte":"Un bon restaurant","prix":200}]},"energie":{"actif":true,"demander_le_matin":true,"cout_defaut":2,"niveaux":[{"id":"plat","titre":"À plat","cout_max":1,"aide":"Juste les petites quêtes, sans te forcer."},{"id":"calme","titre":"Calme","cout_max":2,"aide":"Les petites, et une ou deux un peu plus longues."},{"id":"bien","titre":"Bien","cout_max":3,"aide":"Le rythme habituel."},{"id":"forme","titre":"En forme","cout_max":4,"aide":"Tu peux viser plus grand."},{"id":"elan","titre":"Plein d'élan","cout_max":5,"aide":"Les grosses quêtes d'abord."}]}};
   definir("/jeu/config.json-brut", function (require, module) { module.exports = CONFIG_PUBLIQUE; });
 
   definir("/jeu/serveur/energie.js", function (require, module, exports) {
@@ -633,6 +663,319 @@ module.exports = {
   trouverNiveau,
   vue,
   normaliserPartie,
+};
+
+  });
+
+  definir("/jeu/serveur/edition.js", function (require, module, exports) {
+    var __dirname = "/jeu/serveur";
+    var __filename = "/jeu/serveur/edition.js";
+    var process = nodeProcess;
+    var Buffer = undefined;
+"use strict";
+// Version 7 : le boss de la semaine, la maison d'édition qui grandit, l'import d'une note collée (lecture seule).
+
+const P = require("./parseurs");
+const Q = require("./quetes");
+const E = require("./energie");
+
+const ETAGES = [
+  { id: 0, nom: "Le carton sous le toit", desc: "Une table pliante, une pile de papiers. Ça commence ici." },
+  { id: 1, nom: "L'atelier d'une table", desc: "Un vrai bureau, une lampe, assez pour tenir une journée." },
+  { id: 2, nom: "Le bureau à la fenêtre", desc: "La rue se voit. Les dossiers ont un tiroir." },
+  { id: 3, nom: "La petite maison d'édition", desc: "Une enseigne encore timide, et une pièce pour relire." },
+  { id: 4, nom: "L'enseigne dans la rue", desc: "On te trouve. La vitrine montre le travail de la semaine." },
+  { id: 5, nom: "L'imprimerie au rez-de-chaussée", desc: "Ça sent l'encre. Les pages sortent, les lecteurs passent." },
+  { id: 6, nom: "La maison de quartier", desc: "Le studio tient tout seul. Tu l'as fait grandir, jour après jour." },
+];
+
+const PV_DEFAUT = 12;
+const MAX_PV = 99;
+
+function estObjet(v) {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+function texteCourt(v, max) {
+  return typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "";
+}
+
+function pvValide(v, defaut) {
+  const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
+  return Number.isInteger(n) && n >= 3 && n <= MAX_PV ? n : defaut;
+}
+
+function normaliser(lue) {
+  const src = estObjet(lue) && estObjet(lue.v7) ? lue.v7 : (estObjet(lue) ? lue : {});
+  const v = {
+    horloge: P.dateValide(src.horloge) ? src.horloge : null,
+    boss: null,
+    ids_importes: Array.isArray(src.ids_importes) ? src.ids_importes.filter((id) => typeof id === "string").slice(-800) : [],
+    semaines_vaincues: Number.isInteger(src.semaines_vaincues) && src.semaines_vaincues > 0 ? src.semaines_vaincues : 0,
+  };
+  if (estObjet(src.boss) && typeof src.boss.semaine === "string" && /^[0-9]{4}-W[0-9]{2}$/.test(src.boss.semaine)) {
+    const pv_max = pvValide(src.boss.pv_max, PV_DEFAUT);
+    let pv = Number.isInteger(src.boss.pv) ? Math.max(0, Math.min(pv_max, src.boss.pv)) : pv_max;
+    v.boss = {
+      semaine: src.boss.semaine,
+      nom: texteCourt(src.boss.nom, 80) || ("La semaine " + src.boss.semaine),
+      pv_max,
+      pv,
+      vaincu: src.boss.vaincu === true || pv === 0,
+    };
+    if (v.boss.vaincu) v.boss.pv = 0;
+  }
+  return v;
+}
+
+function assurer(partie, ctx) {
+  if (!partie.v7) partie.v7 = normaliser({});
+  const semaine = ctx.semaine || P.semaineISO(ctx.date).id;
+  const actuel = partie.v7.boss;
+  if (!actuel || actuel.semaine !== semaine) {
+    partie.v7.boss = {
+      semaine,
+      nom: "La semaine " + semaine,
+      pv_max: PV_DEFAUT,
+      pv: PV_DEFAUT,
+      vaincu: false,
+    };
+  }
+  return partie.v7.boss;
+}
+
+function definirBoss(partie, ctx, { nom, pv_max }) {
+  const boss = assurer(partie, ctx);
+  if (boss.vaincu) {
+    const e = new Error("Le boss de cette semaine est déjà vaincu. Tu en écriras un autre la semaine prochaine.");
+    e.code = "DEJA_PAYE";
+    throw e;
+  }
+  const titre = texteCourt(nom, 80);
+  if (titre) boss.nom = titre;
+  const pv = pvValide(pv_max, null);
+  if (pv) {
+    const deja = boss.pv_max - boss.pv;
+    boss.pv_max = pv;
+    boss.pv = Math.max(0, pv - deja);
+    if (boss.pv === 0) {
+      boss.vaincu = true;
+    }
+  }
+  return [{ type: "boss-defini", id: "BOSS-" + boss.semaine, libelle: boss.nom, points: 0, vente: false, pv: boss.pv, pv_max: boss.pv_max }];
+}
+
+function frapperBoss(partie, ctx, degats) {
+  const boss = assurer(partie, ctx);
+  if (boss.vaincu) return null;
+  const coup = Math.max(1, Math.min(5, Number.isInteger(degats) ? degats : 1));
+  boss.pv = Math.max(0, boss.pv - coup);
+  if (boss.pv === 0) {
+    boss.vaincu = true;
+    return {
+      type: "boss-vaincu",
+      id: "BOSS-" + boss.semaine,
+      libelle: "Boss vaincu : " + boss.nom,
+      points: 0,
+      vente: false,
+      nom: boss.nom,
+      semaine: boss.semaine,
+    };
+  }
+  return {
+    type: "boss-coup",
+    id: "BOSS-" + boss.semaine,
+    libelle: boss.nom,
+    points: 0,
+    vente: false,
+    pv: boss.pv,
+    pv_max: boss.pv_max,
+    coup,
+  };
+}
+
+function etageMaison(partie, ctx) {
+  const sys = estObjet(partie.systeme) ? partie.systeme : {};
+  const niveau = Number.isInteger(sys.niveau) ? sys.niveau : 1;
+  const bossVaincus = Number.isInteger(sys.boss_vaincus) ? sys.boss_vaincus : 0;
+  const semaines = estObjet(partie.v7) && partie.v7.boss && partie.v7.boss.vaincu ? 1 : 0;
+  // On compte aussi les anciennes semaines si on les a historisées dans ids? On garde un compteur.
+  const palmares = Number.isInteger(partie.v7 && partie.v7.semaines_vaincues) ? partie.v7.semaines_vaincues : 0;
+  const serie = Array.isArray(partie.jours_actifs) ? partie.jours_actifs.length : 0;
+  const faits = estObjet(partie.paiements) ? Object.keys(partie.paiements).length : 0;
+  const score = Math.max(0, (niveau - 1) + bossVaincus + palmares + semaines + Math.floor(serie / 5) + Math.floor(faits / 12));
+  return Math.max(0, Math.min(ETAGES.length - 1, score));
+}
+
+function noterVictoire(partie) {
+  if (!partie.v7) partie.v7 = normaliser({});
+  partie.v7.semaines_vaincues = (Number.isInteger(partie.v7.semaines_vaincues) ? partie.v7.semaines_vaincues : 0) + 1;
+}
+
+function vueMaison(partie, ctx) {
+  const n = etageMaison(partie, ctx);
+  const etage = ETAGES[n];
+  const suivant = ETAGES[n + 1] || null;
+  return {
+    etage: n,
+    nom: etage.nom,
+    desc: etage.desc,
+    suivant: suivant ? suivant.nom : null,
+    total: ETAGES.length,
+  };
+}
+
+function vueBoss(partie, ctx) {
+  const boss = assurer(partie, ctx);
+  return {
+    semaine: boss.semaine,
+    nom: boss.nom,
+    pv: boss.pv,
+    pv_max: boss.pv_max,
+    vaincu: boss.vaincu === true,
+    pourcentage: Math.round(((boss.pv_max - boss.pv) / Math.max(1, boss.pv_max)) * 100),
+  };
+}
+
+function poserHorloge(partie, date) {
+  if (!partie.v7) partie.v7 = normaliser(partie);
+  if (date === null || date === "" || date === undefined) {
+    partie.v7.horloge = null;
+    return [{ type: "horloge", id: "HORLOGE", libelle: "Retour à la date du jour", points: 0, vente: false }];
+  }
+  if (!P.dateValide(date)) {
+    const e = new Error("La date doit être au format AAAA-MM-JJ.");
+    e.code = "DATE_INVALIDE";
+    throw e;
+  }
+  partie.v7.horloge = date;
+  return [{ type: "horloge", id: "HORLOGE", libelle: "Jour posé : " + date, points: 0, vente: false, date }];
+}
+
+function lireHorlogeDisque(lireDonnees, nomFichier) {
+  try {
+    const lu = lireDonnees(nomFichier);
+    if (estObjet(lu) && estObjet(lu.v7) && P.dateValide(lu.v7.horloge)) return lu.v7.horloge;
+  } catch (err) {
+    return null;
+  }
+  return null;
+}
+
+function normaliserTexte(t) {
+  return String(t || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function coutCategorie(categorie) {
+  const c = normaliserTexte(categorie);
+  if (/deep|focus|profond/.test(c)) return 5;
+  if (/creat|creation/.test(c)) return 3;
+  if (/admin/.test(c)) return 2;
+  if (/sante|relation/.test(c)) return 1;
+  return 2;
+}
+
+function semaineDeNote(texte, dateISO) {
+  const { donnees } = P.lireFrontmatter(texte);
+  if (estObjet(donnees)) {
+    if (typeof donnees.semaine === "string" && /^[0-9]{4}-W[0-9]{2}$/.test(donnees.semaine.trim())) return donnees.semaine.trim();
+    if (P.dateValide(donnees.date)) return P.semaineISO(donnees.date).id;
+  }
+  const m = /20\d{2}-W\d{2}/.exec(texte);
+  if (m) return m[0];
+  return P.semaineISO(dateISO).id;
+}
+
+// Importe les cases d'une note collée. Le jeu les copie chez lui ; la note n'est pas modifiée.
+function importerNote(partie, lu, ctx, texte, majFichierQuetes) {
+  if (typeof texte !== "string" || texte.trim() === "") {
+    const e = new Error("Colle d'abord le texte de ta note de semaine.");
+    e.code = "REQUETE_INVALIDE";
+    throw e;
+  }
+  if (texte.length > 200000) {
+    const e = new Error("Cette note est trop longue. Colle seulement la semaine.");
+    e.code = "REQUETE_INVALIDE";
+    throw e;
+  }
+  const semaine = semaineDeNote(texte, ctx.date);
+  const motsV = (ctx.config && ctx.config.mots_vente) || [];
+  const motsN = (ctx.config && ctx.config.mots_newsletter) || [];
+  const lues = P.lireQuetes(texte, semaine, motsV, motsN);
+  const plan = P.lirePlanJours(texte, semaine);
+  const connues = new Set(lu.quetes.map((q) => normaliserTexte(q.texte)));
+  const ajoutees = [];
+  const ignorees = [];
+  const dejaFaites = [];
+  const titulaire = "Note " + semaine;
+
+  function ajouterLigne(texteQuete, categorie, dejaCochee) {
+    const propre = texteCourt(texteQuete, 160);
+    if (!propre) return;
+    const cle = normaliserTexte(propre);
+    if (!cle) return;
+    if (connues.has(cle)) {
+      ignorees.push(propre);
+      return;
+    }
+    connues.add(cle);
+    if (dejaCochee) {
+      dejaFaites.push(propre);
+      return;
+    }
+    const cout = coutCategorie(categorie);
+    majFichierQuetes(ctx, lu, Q.ajouter(ctx.texteQuetes, { texte: propre, type: null, degres: null, cout_energie: cout }, titulaire));
+    const nouvelle = lu.quetes.find((q) => q.origine === "locale" && normaliserTexte(q.texte) === cle);
+    if (nouvelle) {
+      E.poserCout(partie, nouvelle.id, cout);
+      if (!partie.v7) partie.v7 = normaliser(partie);
+      partie.v7.ids_importes.push(nouvelle.id);
+      ajoutees.push({ id: nouvelle.id, texte: nouvelle.texte, cout_energie: cout });
+    }
+  }
+
+  for (const q of lues) ajouterLigne(q.texte, q.categorie, q.cochee === true);
+  if (plan && Array.isArray(plan.jours)) {
+    for (const jour of plan.jours) {
+      for (const prio of jour.priorites || []) ajouterLigne(prio.texte, "priorite", false);
+    }
+  }
+
+  return [{
+    type: "note-importee",
+    id: "NOTE-" + semaine,
+    libelle: ajoutees.length ? (ajoutees.length + " quête" + (ajoutees.length > 1 ? "s" : "") + " venues de la note " + semaine) : "Aucune nouvelle quête à prendre dans cette note",
+    points: 0,
+    vente: false,
+    semaine,
+    ajoutees: ajoutees.length,
+    ignorees: ignorees.length,
+    deja_faites: dejaFaites.length,
+    textes: ajoutees.map((a) => a.texte),
+  }];
+}
+
+module.exports = {
+  ETAGES,
+  PV_DEFAUT,
+  normaliser,
+  assurer,
+  definirBoss,
+  frapperBoss,
+  noterVictoire,
+  vueMaison,
+  vueBoss,
+  poserHorloge,
+  lireHorlogeDisque,
+  importerNote,
+  semaineDeNote,
+  coutCategorie,
+  etageMaison,
 };
 
   });
@@ -4321,7 +4664,9 @@ function agir(partie, ctx, chemin, corps) {
   const cfg = ctx.config.systeme;
   if (!cfg.actif) throw refus("LIEU_FERME", "Le Système est coupé. Il se rallume dans Réglages.");
   const s = partie.systeme;
-  if (!s.eveille) throw refus("LIEU_FERME", "Le Système s'éveillera à ta première quête.");
+  // Écrire ou retirer une récompense personnelle n'a pas besoin d'attendre la première quête.
+  const avantEveil = /^(recompenses\/ajouter|recompenses\/[^/]+\/retirer)$/.test(String(chemin));
+  if (!s.eveille && !avantEveil) throw refus("LIEU_FERME", "Le Système s'éveillera à ta première quête.");
   for (const { motif, re } of MOTIFS) {
     const m = re.exec(String(chemin));
     if (!m) continue;
@@ -4919,7 +5264,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const DOSSIER_JEU = path.resolve(__dirname, "..");
-const VERSION = "6.0.0";
+const VERSION = "7.0.0";
 
 // Motif qui protège les dossiers de l'employeur précédent : jamais ouverts.
 const MOTIF_INTERDIT = /france[-_ ]?ia/i;
@@ -5514,6 +5859,7 @@ const Q = require("./quetes");
 const reglages = require("./reglages");
 const S = require("./systeme");
 const E = require("./energie");
+const V7 = require("./edition");
 
 const FICHIER_PARTIE = "partie.json";
 const FICHIER_TEST = "partie-test.json";
@@ -5577,6 +5923,7 @@ function nouvellePartie(horodatage) {
     systeme: S.etatNeuf(),
     energies: {},
     couts_energie: {},
+    v7: V7.normaliser({}),
   };
 }
 
@@ -5663,6 +6010,7 @@ function normaliser(lue, horodatage) {
   const energiePartie = E.normaliserPartie(lue);
   p.energies = energiePartie.energies;
   p.couts_energie = energiePartie.couts_energie;
+  p.v7 = V7.normaliser(lue);
   return p;
 }
 
@@ -5858,6 +6206,8 @@ function payer(partie, lu, element, type, source, ctx, jour, degre) {
   }
   R.apresQuete(partie, ctx, element.id, paiement, gains);
   S.apresQuete(partie, ctx, element.id, paiement);
+  const coup = V7.frapperBoss(partie, ctx, E.coutDe(partie, element, ctx.config.energie || E.completer()));
+  if (coup && coup.type === "boss-vaincu") V7.noterVictoire(partie);
   return gains;
 }
 
@@ -6404,6 +6754,18 @@ const ACTIONS = {
     E.poserCout(partie, id, c);
     return [];
   },
+
+  poserHorloge(partie, lu, ctx, { date }) {
+    return V7.poserHorloge(partie, date === undefined ? null : date);
+  },
+
+  definirBossSemaine(partie, lu, ctx, { nom, pv_max }) {
+    return V7.definirBoss(partie, ctx, { nom, pv_max });
+  },
+
+  importerNoteSemaine(partie, lu, ctx, { texte }) {
+    return V7.importerNote(partie, lu, ctx, texte, majFichierQuetes);
+  },
 };
 
 // ---------------------------------------------------------------- badges et jalons
@@ -6731,6 +7093,9 @@ function vueEtat(partie, registre, lu, ctx, gains, evenements, avertissements, l
       ctx.date,
       config.energie || E.completer()
     ),
+    maison: V7.vueMaison(partie, ctx),
+    boss: V7.vueBoss(partie, ctx),
+    horloge_locale: partie.v7 && partie.v7.horloge ? partie.v7.horloge : null,
     assistant: { fait: partie.assistant_fait, a_proposer: !partie.assistant_fait && R.aJoue(partie), coffre_trouve: Boolean(lu.chemin) },
     partie: vuePartie(partie, ctx),
     lieux: vueLieux(partie, registre, config),
@@ -6760,12 +7125,21 @@ function vueEtat(partie, registre, lu, ctx, gains, evenements, avertissements, l
 // ---------------------------------------------------------------- point d'entrée
 
 // options : { config, date (simulée, facultative), demo, maintenant et hasard (pour les tests) }
+function dateLocaleSiBesoin(options) {
+  if (options.date || options.demo) return null;
+  return V7.lireHorlogeDisque(garde.lireDonnees, FICHIER_PARTIE);
+}
+
 function contexte(options, config) {
   const simulation = Boolean(options.date);
   if (simulation && !P.dateValide(options.date)) {
     throw new ErreurJeu("DATE_INVALIDE", "La date doit être au format AAAA-MM-JJ.");
   }
-  const horloge = P.horloge(config.fuseau, options.date || null, options.maintenant);
+  const dateEffective = options.date || dateLocaleSiBesoin(options);
+  if (dateEffective && !P.dateValide(dateEffective)) {
+    throw new ErreurJeu("DATE_INVALIDE", "La date doit être au format AAAA-MM-JJ.");
+  }
+  const horloge = P.horloge(config.fuseau, dateEffective || null, options.maintenant);
   const hasard = typeof options.hasard === "function" ? options.hasard : (n) => crypto.randomInt(n);
   // le hasard du Système (butin, événement du jour) a sa propre source, pour ne pas décaler celui des colis
   const hasardSysteme = typeof options.hasardSysteme === "function" ? options.hasardSysteme : (n) => crypto.randomInt(n);
@@ -6895,6 +7269,12 @@ function jouer(options, action, parametres) {
   nettoyerEnCours(partie, lu, ctx.config);
   // Action refusée : rien n'est écrit. Les cases cochées dans la note seront payées et annoncées à l'appel suivant.
   if (action) gains.push(...ACTIONS[action](partie, lu, ctx, parametres || {}).filter(Boolean));
+  if (action === "poserHorloge") {
+    const datePosee = partie.v7 && partie.v7.horloge ? partie.v7.horloge : null;
+    const horloge = P.horloge(ctx.config.fuseau, datePosee, options.maintenant);
+    ctx = { ...ctx, ...horloge, simulation: false };
+    ctx.semaine = lu.semaine ? lu.semaine.id : P.semaineISO(ctx.date).id;
+  }
   if (ctx.patchModifie) {
     // les réglages viennent de changer : la suite se calcule avec la nouvelle configuration
     const config = configuration.effective(ctx.base, ctx.patch);
@@ -6988,6 +7368,7 @@ module.exports = {
     partie: function () { return req("/jeu/serveur/partie.js"); },
     sauvegarde: function () { return req("/jeu/serveur/sauvegarde.js"); },
     energie: function () { return req("/jeu/serveur/energie.js"); },
+    edition: function () { return req("/jeu/serveur/edition.js"); },
     restaurer: restaurer,
     restaurerSync: restaurerSync,
     persister: demanderPersistance,
@@ -6995,6 +7376,6 @@ module.exports = {
     ecrireFichier: function (chemin, texte) { nodeFs.writeFileSync(chemin, texte, "utf8"); },
     lireFichier: function (chemin) { try { return nodeFs.readFileSync(chemin, "utf8"); } catch (e) { return null; } },
     snapshot: snapshot,
-    vider: function () { appliquerSnapshot({}); demanderPersistance(); },
+    vider: function () { disqueSauveLe = 0; appliquerSnapshot({ v: 2, sauve_le: Date.now(), disque: {} }, { forcer: true }); demanderPersistance(); },
   };
 })(typeof window !== "undefined" ? window : globalThis);

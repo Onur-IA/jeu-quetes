@@ -1,5 +1,5 @@
 "use strict";
-// Version 6 : le jeu tourne dans le navigateur, sans serveur.
+// Version 7 : le jeu tourne dans le navigateur, sans serveur.
 // Les appels /api/ sont traités ici, par le moteur local. La partie vit dans
 // localStorage et IndexedDB, sur cet appareil. Rien n'est envoyé ailleurs.
 (function (racine) {
@@ -15,6 +15,9 @@
     [/^\/api\/quetes\/ajouter$/, "ajouterQuete", (m, corps) => ({ texte: corps.texte, type: corps.type, degres: corps.degres, cout_energie: corps.cout_energie })],
     [/^\/api\/energie$/, "choisirEnergie", (m, corps) => ({ niveau: corps.niveau || corps.id })],
     [/^\/api\/quetes\/([^/]+)\/energie$/, "definirCoutEnergie", (m, corps) => ({ id: m[1], cout: corps.cout })],
+    [/^\/api\/horloge$/, "poserHorloge", (m, corps) => ({ date: Object.prototype.hasOwnProperty.call(corps || {}, "date") ? corps.date : null })],
+    [/^\/api\/boss$/, "definirBossSemaine", (m, corps) => ({ nom: corps.nom, pv_max: corps.pv_max })],
+    [/^\/api\/semaine\/coller$/, "importerNoteSemaine", (m, corps) => ({ texte: corps.texte })],
     [/^\/api\/quetes\/([^/]+)\/valider$/, "validerQuete", (m, corps) => ({ id: m[1], degre: corps.degre })],
     [/^\/api\/priorites\/([^/]+)\/valider$/, "validerPriorite", (m, corps) => ({ id: m[1], degre: corps.degre })],
     [/^\/api\/quetes\/([^/]+)\/type$/, "changerType", (m, corps) => ({ id: m[1], type: corps.type })],
@@ -173,6 +176,12 @@
       return jsonReponse(200, { ok: true, gains: [], import: bilan, partie: etat.partie, etat });
     }
     if (chemin === "/api/test/reinitialiser") {
+      if (!contexte.date && !contexte.demo) {
+        M.vider();
+        amorcer();
+        const etat = partie.etat({ config, date: null, demo: false });
+        return jsonReponse(200, { ok: true, gains: [], partie: etat.partie, etat, vide: true });
+      }
       const etat = partie.reinitialiserTest(contexte);
       return jsonReponse(200, { ok: true, gains: [], partie: etat.partie, etat });
     }

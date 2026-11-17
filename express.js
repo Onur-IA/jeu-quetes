@@ -1,5 +1,5 @@
 "use strict";
-// Version 5 : le mode express. Les quêtes du jour, cochées en deux secondes, au pouce ou à la souris.
+// Version 7 : le mode express. Les quêtes du jour, cochées au pouce, avec la maison, le boss de la semaine, et l'énergie.
 // - Toucher une carte : c'est fait (degré par défaut). Appui long : choisir le degré.
 // - Glisser vers la droite : fait. Vers la gauche : à demain.
 // - Hors ligne : le dernier état connu s'affiche, les gestes attendent dans une file (localStorage)
@@ -138,6 +138,7 @@
   function appliquer(nouvel, options) {
     if (!nouvel || typeof nouvel !== "object") return;
     const avant = etat && etat.systeme && etat.systeme.hud ? etat.systeme.hud : null;
+    const bossAvant = etat && etat.boss ? etat.boss.vaincu : false;
     etat = nouvel;
     if (!(options && options.horsLigne)) {
       locales.clear();
@@ -151,9 +152,10 @@
     dessiner();
     const apres = etat.systeme && etat.systeme.hud ? etat.systeme.hud : null;
     if (avant && apres && (nombre(apres.niveau, 1) > nombre(avant.niveau, 1))) {
-      Son.jouer("niveau_systeme");
-      Haptique.toc("journee");
-      afficherToast("Niveau " + apres.niveau + " ! " + (apres.rang !== avant.rang ? "Nouveau rang : " + apres.rang + "." : "Continue comme ça."));
+      feterNiveau(apres, avant);
+    }
+    if (etat && etat.boss && etat.boss.vaincu && !bossAvant) {
+      feterBoss(etat.boss);
     }
     verifierFete();
     if (nouvel && nouvel.energie && nouvel.energie.a_choisir && !(options && options.horsLigne) && !ouvrirEnergie.deja) {
@@ -243,13 +245,31 @@
     );
   }
 
+  function htmlMaison() {
+    const m = etat && etat.maison;
+    if (!m) return "";
+    let tours = "";
+    for (let i = 0; i <= nombre(m.etage, 0); i++) tours += '<i class="n' + i + '"></i>';
+    return '<button type="button" class="x-maison" data-x="maison" aria-label="' + e(m.nom) + '"><span class="x-maison-dessin" data-etage="' + e(m.etage) + '">' + tours + '</span><span class="x-maison-texte"><b>' + e(m.nom) + "</b><small>" + e(m.desc) + (m.suivant ? " Ensuite : " + e(m.suivant) + "." : "") + "</small></span></button>";
+  }
+
+  function htmlBoss() {
+    const b = etat && etat.boss;
+    if (!b) return "";
+    if (b.vaincu) {
+      return '<button type="button" class="x-boss vaincu" data-x="boss"><span class="x-boss-titre"><b>Boss vaincu</b> ' + e(b.nom) + '</span><small>Cette semaine, la maison a grandi.</small></button>';
+    }
+    return '<button type="button" class="x-boss" data-x="boss"><span class="x-boss-titre"><b>Boss de la semaine</b> ' + e(b.nom) + '</span><span class="x-boss-barre" aria-hidden="true"><i style="width:' + e(nombre(b.pourcentage, 0)) + '%"></i></span><small>' + e(b.pv) + " / " + e(b.pv_max) + " PV, chaque quête le fait reculer</small></button>";
+  }
+
   function dessiner() {
     $("x-hud").innerHTML = htmlHud();
+    if ($("x-maison")) $("x-maison").innerHTML = htmlMaison();
     $("x-anneau").innerHTML = htmlAnneau();
     const b = bilan();
     const c = b.c;
     const enAttente = new Set(lireLocal(CLE_FILE, []).map((g) => g.cle));
-    let h = "";
+    let h = htmlBoss();
     const eg = c.energie;
     if (eg && eg.actif) {
       if (eg.choisi) {
@@ -325,6 +345,7 @@
 
   function rendreVide() {
     $("x-hud").innerHTML = htmlHud();
+    if ($("x-maison")) $("x-maison").innerHTML = "";
     $("x-anneau").innerHTML = "";
     $("x-liste").innerHTML = local()
       ? '<p class="x-vide">La partie n\'a pas encore été chargée. Réessaie dans un instant, ou importe une sauvegarde depuis Sauvegarde.</p>'
@@ -416,12 +437,60 @@
     voile.className = "x-fete";
     voile.setAttribute("role", "dialog");
     voile.setAttribute("aria-label", "Journée bouclée");
-    voile.innerHTML = "<div><b>Journée bouclée</b><p>Toutes tes quêtes du jour sont faites." + (serie > 1 ? " Série de " + serie + " jours, garde la flamme." : "") + '</p><button type="button" class="x-btn">Merci, Système</button></div>';
-    voile.addEventListener("click", () => {
+    voile.innerHTML = "<div><b>Journée bouclée</b><p>Toutes tes quêtes du jour sont faites." + (serie > 1 ? " Série de " + serie + " jours, garde la flamme." : "") + '</p><button type="button" class="x-btn" data-x="fermer-fete">Merci, Système</button></div>';
+    const fermer = () => {
+      if (!voile.isConnected) return;
       voile.remove();
       racine.setTimeout(() => Son.ambiance("elan"), 4000);
+    };
+    voile.addEventListener("pointerup", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      fermer();
+    });
+    voile.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      fermer();
     });
     doc.body.appendChild(voile);
+  }
+
+  function poserVoile(classe, label, htmlInterieur, son) {
+    if (son) Son.jouer(son);
+    Haptique.toc("journee");
+    const voile = doc.createElement("div");
+    voile.className = classe;
+    voile.setAttribute("role", "dialog");
+    voile.setAttribute("aria-label", label);
+    voile.innerHTML = htmlInterieur;
+    const fermer = () => { if (voile.isConnected) voile.remove(); };
+    voile.addEventListener("pointerup", (ev) => { ev.preventDefault(); ev.stopPropagation(); fermer(); });
+    voile.addEventListener("click", (ev) => { ev.preventDefault(); fermer(); });
+    doc.body.appendChild(voile);
+    return voile;
+  }
+
+  function feterNiveau(apres, avant) {
+    confettis();
+    const rang = apres.rang && apres.rang !== (avant && avant.rang) ? "Nouveau rang : " + apres.rang + "." : "Continue comme ça.";
+    if (apres.rang && avant && apres.rang !== avant.rang) Son.jouer("rang");
+    poserVoile(
+      "x-niveau",
+      "Niveau " + apres.niveau,
+      "<div><span class=\"x-rang-fete\">" + e(apres.rang || "") + "</span><b>Niveau " + e(apres.niveau) + " !</b><p>" + e(rang) + '</p><button type="button" class="x-btn" data-x="fermer-fete">En avant</button></div>',
+      "niveau_systeme"
+    );
+  }
+
+  function feterBoss(boss) {
+    confettis();
+    const nom = boss && boss.nom ? boss.nom : "le boss de la semaine";
+    poserVoile(
+      "x-fete",
+      "Boss vaincu",
+      "<div><b>Boss vaincu</b><p>" + e(nom) + " tombe. Ta maison d'édition grandit.</p><button type=\"button\" class=\"x-btn\" data-x=\"fermer-fete\">Quelle équipe</button></div>",
+      "boss"
+    );
   }
 
   function confettis() {
@@ -484,7 +553,7 @@
       marquerLigne(true);
       const apres = reponse.etat && reponse.etat.systeme ? reponse.etat.systeme.hud : null;
       gainsAffiches(el, avant, apres, reponse);
-      racine.setTimeout(() => appliquer(reponse.etat), 650);
+      racine.setTimeout(() => appliquer(reponse.etat, { reponse }), 650);
       return reponse;
     } catch (err) {
       if (err.code === "RESEAU") {
@@ -620,7 +689,7 @@
     Haptique.toc("leger");
     Son.jouer("clic");
     const degres = Array.isArray(q.degres) && q.degres.length === 3 ? q.degres : ["Commencé pour de bon", "Fait, comme prévu", "Fait, et mieux que prévu"];
-    let h = '<div><h3 id="x-degres-titre">' + e(q.texte) + "</h3><p>Quel degré as-tu atteint ?</p>";
+    let h = '<div>' + barreFermer() + '<h3 id="x-degres-titre">' + e(q.texte) + "</h3><p>Quel degré as-tu atteint ?</p>";
     degres.forEach((d, i) => {
       const g = Array.isArray(q.gains) ? q.gains[i] : 0;
       h += '<button type="button" class="x-degre" data-x="degre" data-id="' + e(q.id) + '" data-genre="' + (q.genre === "priorite" ? "priorite" : "ligne") + '" data-degre="' + (i + 1) + '"><b>' + (i + 1) + "</b><span>" + e(d) + '</span><span class="x-gain' + (q.mode === "payee" && g > 0 ? "" : " recit") + '">' + (q.mode === "payee" && g > 0 ? "+" + e(g) : "au journal") + "</span></button>";
@@ -655,7 +724,7 @@
     }
     const garde = lireLocal(CLE_ETAT, null);
     const surAppareil = local() || (appareil && appareil.local);
-    let h = '<div><h3 id="x-panneau-titre">' + (surAppareil ? "Sauvegarde" : "Synchro et téléphone") + "</h3><dl class=\"x-etat\">";
+    let h = '<div>' + barreFermer() + '<h3 id="x-panneau-titre">' + (surAppareil ? "Sauvegarde" : "Synchro et téléphone") + "</h3><dl class=\"x-etat\">";
     if (surAppareil) {
       h += "<dt>Où vit ta partie</dt><dd>Sur cet appareil, dans le navigateur. Rien n'est envoyé ailleurs.</dd>";
       h += "<dt>Hors ligne</dt><dd>" + (pret ? "prêt : l'appli s'ouvre sans réseau" : sw ? "presque prêt : ferme l'appli et rouvre-la une fois" : "l'appli marche, le hors ligne complet vient après l'ajout à l'écran d'accueil") + "</dd>";
@@ -677,16 +746,20 @@
     h += "<h3>Un fichier, sans compte</h3><p>Exporte ta partie, range le fichier où tu veux (Drive, coffre, un autre téléphone). L'import remplace la partie de cet appareil : l'ancienne est mise de côté, tu pourras la reprendre.</p>";
     if (!DATE && !DEMO) {
       h += '<button type="button" class="x-btn" data-x="exporter">Exporter ma partie</button>';
-      h += '<label class="x-btn second">Importer un fichier<input type="file" accept="application/json,.json" data-x="importer" hidden></label>';
+      h += '<label class="x-btn second">Importer un fichier<input type="file" accept="application/json,.json" class="x-fichier" data-x="importer"></label>';
     } else {
       h += "<p>(Pas de sauvegarde en mode démo ou date simulée.)</p>";
     }
 
+    h += "<h3>La semaine</h3>";
+    h += '<button type="button" class="x-btn second" data-x="note">Coller ma note de semaine</button>';
+    h += '<button type="button" class="x-btn second" data-x="recompenses">Mes récompenses</button>';
+    h += '<button type="button" class="x-btn second" data-x="boss">Le boss de la semaine</button>';
     h += "<h3>Retours</h3>";
     h += '<button type="button" class="x-btn second" data-x="musique">' + (Son.reglages().musique_active ? "Couper la musique" : "Lancer la musique") + "</button>";
     h += '<button type="button" class="x-btn second" data-x="vibrer">' + (Haptique.actif() ? "Couper les vibrations" : "Activer les vibrations") + "</button>";
     if (file.length) h += '<button type="button" class="x-btn second" data-x="file-envoyer">Envoyer les gestes en attente</button>';
-    h += '<p><button type="button" class="x-btn fermer" data-x="fermer">Fermer</button></p></div>';
+    h += piedFermer() + '</div>';
     f.innerHTML = h;
     f.hidden = false;
     masquerToast();
@@ -752,13 +825,13 @@
     if (!eg || !eg.actif || !Array.isArray(eg.niveaux) || !eg.niveaux.length) return;
     Son.jouer("fenetre");
     const f = $("x-panneau");
-    let h = '<div><h3 id="x-panneau-titre">Comment tu te sens aujourd\'hui ?</h3>';
+    let h = '<div>' + barreFermer() + '<h3 id="x-panneau-titre">Comment tu te sens aujourd\'hui ?</h3>';
     h += "<p>Le jeu te proposera les quêtes qui collent. Tu pourras changer d'avis plus tard, et régler le coût de chaque quête.</p>";
     for (const n of eg.niveaux) {
       const on = eg.choisi && eg.choisi.id === n.id;
       h += '<button type="button" class="x-energie-choix' + (on ? " actif" : "") + '" data-x="choix-energie" data-niveau="' + e(n.id) + '"><b>' + e(n.titre) + "</b><span>jusqu'au coût " + e(n.cout_max) + (n.aide ? " · " + e(n.aide) : "") + "</span></button>";
     }
-    h += '<p><button type="button" class="x-btn fermer" data-x="fermer">Plus tard</button></p></div>';
+    h += '<p class="x-pied"><button type="button" class="x-btn fermer" data-x="fermer">Plus tard</button></p></div>';
     f.innerHTML = h;
     f.hidden = false;
     masquerToast();
@@ -789,6 +862,149 @@
       Son.jouer("erreur");
       afficherToast(err.message);
     }
+  }
+
+  function orEnPoche() {
+    const hud = etat && etat.systeme && etat.systeme.hud;
+    return hud ? nombre(hud.or, 0) : 0;
+  }
+
+  function ouvrirMaison() {
+    Son.jouer("fenetre");
+    const m = etat && etat.maison ? etat.maison : { nom: "Ta maison d'édition", desc: "Elle grandit avec tes quêtes.", suivant: null };
+    const f = $("x-panneau");
+    let h = '<div>' + barreFermer() + '<h3 id="x-panneau-titre">' + e(m.nom) + "</h3><p>" + e(m.desc) + "</p>";
+    if (m.suivant) h += "<p>Prochaine étape : " + e(m.suivant) + ".</p>";
+    h += "<p>Elle grandit quand tu montes de niveau, quand tu bats le boss de la semaine, et quand tu enchaînes les jours.</p>";
+    h += '<button type="button" class="x-btn" data-x="recompenses">Mes récompenses</button>';
+    h += '<button type="button" class="x-btn second" data-x="note">Coller ma note de semaine</button>';
+    h += '<button type="button" class="x-btn second" data-x="boss">Le boss de la semaine</button>';
+    h += piedFermer() + '</div>';
+    f.innerHTML = h;
+    f.hidden = false;
+    masquerToast();
+  }
+
+  function ouvrirNote() {
+    Son.jouer("fenetre");
+    const f = $("x-panneau");
+    f.innerHTML = '<div>' + barreFermer() + '<h3 id="x-panneau-titre">Coller la note de la semaine</h3><p>Le jeu lit ta note, il n\'y écrit jamais. Les cases déjà cochées ne sont pas payées. Les nouvelles lignes deviennent des quêtes, ici, sur cet appareil.</p><textarea id="x-note" rows="10" placeholder="- [ ] Écrire la newsletter&#10;- [ ] Appeler un client" aria-label="Texte de ta note de semaine"></textarea><button type="button" class="x-btn" data-x="coller-note">Importer les quêtes</button>' + piedFermer() + '</div>';
+    f.hidden = false;
+    masquerToast();
+    const zone = $("x-note");
+    if (zone) zone.focus();
+  }
+
+  async function collerNote() {
+    const zone = $("x-note");
+    const texte = zone ? zone.value : "";
+    try {
+      const r = await api("POST", "/api/semaine/coller", { texte });
+      fermerFeuilles();
+      appliquer(r.etat, { reponse: r });
+      const g = Array.isArray(r.gains) ? r.gains.find((x) => x && x.type === "note-importee") : null;
+      const n = g ? nombre(g.ajoutees, 0) : 0;
+      Son.jouer("cran");
+      afficherToast(n ? pluriel(n, "quête importée", "quêtes importées") + " depuis ta note." : "Aucune nouvelle quête dans cette note.");
+    } catch (err) {
+      afficherToast(err.message);
+    }
+  }
+
+  function ouvrirBoss() {
+    Son.jouer("fenetre");
+    const b = etat && etat.boss ? etat.boss : { nom: "", pv_max: 12, pv: 12, vaincu: false };
+    const f = $("x-panneau");
+    let h = '<div>' + barreFermer() + '<h3 id="x-panneau-titre">Boss de la semaine</h3>';
+    if (b.vaincu) {
+      h += "<p>Tu as déjà vaincu « " + e(b.nom) + " » cette semaine. Un nouveau boss arrivera lundi.</p>";
+    } else {
+      h += "<p>Chaque quête faite lui retire des points de vie. Donne-lui le nom que tu veux (un chapitre, une relance, une semaine tenue).</p>";
+      h += '<label>Son nom<input type="text" id="x-boss-nom" maxlength="80" value="' + e(b.nom) + '"></label>';
+      h += '<label>Points de vie (3 à 99)<input type="number" id="x-boss-pv" min="3" max="99" value="' + e(b.pv_max) + '"></label>';
+      h += '<button type="button" class="x-btn" data-x="sauver-boss">Enregistrer</button>';
+    }
+    h += piedFermer() + '</div>';
+    f.innerHTML = h;
+    f.hidden = false;
+    masquerToast();
+  }
+
+  async function sauverBoss() {
+    const nom = ($("x-boss-nom") && $("x-boss-nom").value) || "";
+    const pv = $("x-boss-pv") ? Number($("x-boss-pv").value) : undefined;
+    try {
+      const r = await api("POST", "/api/boss", { nom, pv_max: pv });
+      fermerFeuilles();
+      appliquer(r.etat, { reponse: r });
+      Son.jouer("cran");
+      afficherToast("Boss de la semaine enregistré.");
+    } catch (err) {
+      afficherToast(err.message);
+    }
+  }
+
+  function ouvrirRecompenses() {
+    Son.jouer("fenetre");
+    const listeRec = (etat && etat.systeme && Array.isArray(etat.systeme.recompenses)) ? etat.systeme.recompenses : [];
+    const or = orEnPoche();
+    const f = $("x-panneau");
+    let h = '<div>' + barreFermer() + '<h3 id="x-panneau-titre">Mes récompenses</h3><p>Tu les écris toi-même, tu fixes leur prix en or. Tu as ' + e(or) + " or.</p>";
+    if (!listeRec.length) h += "<p>Aucune pour l'instant. Offre-toi une pause, un café, un film : c'est toi qui décides.</p>";
+    for (const r of listeRec) {
+      h += '<div class="x-recompense"><span>' + e(r.texte) + " · " + e(r.prix) + " or" + (r.achats ? " (prise " + e(r.achats) + " fois)" : "") + '</span>';
+      h += '<button type="button" class="x-btn" data-x="acheter-recompense" data-id="' + e(r.id) + '">Prendre</button>';
+      h += '<button type="button" class="x-btn second" data-x="retirer-recompense" data-id="' + e(r.id) + '">Retirer</button></div>';
+    }
+    h += '<h3>En ajouter une</h3><label>Nom<input type="text" id="x-rec-nom" maxlength="80" placeholder="Une vraie pause de vingt minutes"></label>';
+    h += '<label>Prix en or<input type="number" id="x-rec-prix" min="1" max="9999" value="25"></label>';
+    h += '<button type="button" class="x-btn" data-x="ajouter-recompense">Ajouter</button>';
+    h += piedFermer() + '</div>';
+    f.innerHTML = h;
+    f.hidden = false;
+    masquerToast();
+  }
+
+  async function ajouterRecompense() {
+    const texte = ($("x-rec-nom") && $("x-rec-nom").value) || "";
+    const prix = $("x-rec-prix") ? Number($("x-rec-prix").value) : 25;
+    try {
+      const r = await api("POST", "/api/systeme/recompenses/ajouter", { texte, prix });
+      appliquer(r.etat, { reponse: r });
+      Son.jouer("cran");
+      ouvrirRecompenses();
+    } catch (err) {
+      afficherToast(err.message);
+    }
+  }
+
+  async function acheterRecompense(id) {
+    try {
+      const r = await api("POST", "/api/systeme/recompenses/" + encodeURIComponent(id) + "/acheter", {});
+      appliquer(r.etat, { reponse: r });
+      Son.jouer("butin");
+      afficherToast("Récompense prise. Profites-en vraiment.");
+      ouvrirRecompenses();
+    } catch (err) {
+      afficherToast(err.message);
+    }
+  }
+
+  async function retirerRecompense(id) {
+    try {
+      const r = await api("POST", "/api/systeme/recompenses/" + encodeURIComponent(id) + "/retirer", {});
+      appliquer(r.etat, { reponse: r });
+      ouvrirRecompenses();
+    } catch (err) {
+      afficherToast(err.message);
+    }
+  }
+
+  function barreFermer() {
+    return '<button type="button" class="x-fermer-haut" data-x="fermer" aria-label="Fermer">Fermer</button>';
+  }
+  function piedFermer() {
+    return '<p class="x-pied"><button type="button" class="x-btn fermer" data-x="fermer">Fermer</button></p>';
   }
 
   function fermerFeuilles() {
@@ -858,25 +1074,8 @@
       reporter(d.id, s.carte);
     }
   }
-  doc.addEventListener("pointerup", (ev) => finSuivi(ev, false));
-  doc.addEventListener("pointercancel", (ev) => finSuivi(ev, true));
-  doc.addEventListener("contextmenu", (ev) => {
-    if (ev.target.closest(".x-carte")) ev.preventDefault();
-  });
-
-  doc.addEventListener("click", (ev) => {
-    // Juste après un appui long ou un glisser, le clic qui suit (sous le doigt) ne compte pas :
-    // il fermerait la feuille des degrés qui vient de s'ouvrir, ou cocherait une seconde fois.
-    if (Date.now() < ignorerClicJusqua) {
-      ignorerClicJusqua = 0; // un seul clic avalé : le suivant (choisir un degré) compte
-      ev.preventDefault();
-      return;
-    }
-    const el = ev.target.closest("[data-geste], [data-x]");
-    if (!el) {
-      if (ev.target.classList && ev.target.classList.contains("x-feuille")) fermerFeuilles();
-      return;
-    }
+  function agir(el) {
+    if (!el || el.disabled) return;
     const d = el.dataset;
     if (d.geste === "quete") return valider(d.id, d.genre, null, el);
     if (d.geste === "quotidienne") return cocherQuotidienne(d.id, el);
@@ -889,6 +1088,7 @@
         fermerFeuilles();
         return reporter(d.id, doc.querySelector('.x-carte[data-id="' + CSS.escape(d.id) + '"]'));
       case "fermer":
+      case "fermer-fete":
         return fermerFeuilles();
       case "synchro":
         return ouvrirSynchro();
@@ -900,6 +1100,24 @@
         return choisirEnergie(d.niveau);
       case "cout":
         return definirCout(d.id, d.cout);
+      case "maison":
+        return ouvrirMaison();
+      case "note":
+        return ouvrirNote();
+      case "coller-note":
+        return collerNote();
+      case "boss":
+        return ouvrirBoss();
+      case "sauver-boss":
+        return sauverBoss();
+      case "recompenses":
+        return ouvrirRecompenses();
+      case "ajouter-recompense":
+        return ajouterRecompense();
+      case "acheter-recompense":
+        return acheterRecompense(d.id);
+      case "retirer-recompense":
+        return retirerRecompense(d.id);
       case "son": {
         const oui = !Son.actif;
         ecrireLocal(CLE_SON, oui);
@@ -929,16 +1147,50 @@
         return dessiner();
       }
       case "toast": {
-        const t = $("x-toast");
-        const a = t._action;
-        t.hidden = true;
-        t._action = null;
+        const zone = $("x-toast");
+        const a = zone._action;
+        zone.hidden = true;
+        zone._action = null;
         if (a && a.faire) a.faire();
         return;
       }
       default:
         return;
     }
+  }
+
+  doc.addEventListener("pointerup", (ev) => {
+    finSuivi(ev, false);
+    if (ev.button > 0) return;
+    if (ev.target && ev.target.closest && ev.target.closest("input, textarea, select, label, a[href]")) return;
+    if (Date.now() < ignorerClicJusqua) return;
+    const el = ev.target.closest("[data-geste], [data-x]");
+    if (!el) {
+      if (ev.target.classList && ev.target.classList.contains("x-feuille")) fermerFeuilles();
+      return;
+    }
+    ignorerClicJusqua = Date.now() + 500;
+    agir(el);
+  });
+  doc.addEventListener("pointercancel", (ev) => finSuivi(ev, true));
+  doc.addEventListener("contextmenu", (ev) => {
+    if (ev.target.closest(".x-carte")) ev.preventDefault();
+  });
+
+  doc.addEventListener("click", (ev) => {
+    // Juste après un appui long, un glisser ou un pointerup déjà compté, le clic qui suit ne compte pas.
+    if (Date.now() < ignorerClicJusqua) {
+      ignorerClicJusqua = 0;
+      ev.preventDefault();
+      return;
+    }
+    if (ev.target && ev.target.closest && ev.target.closest("input[type=file], input, textarea, select")) return;
+    const el = ev.target.closest("[data-geste], [data-x]");
+    if (!el) {
+      if (ev.target.classList && ev.target.classList.contains("x-feuille")) fermerFeuilles();
+      return;
+    }
+    agir(el);
   });
   doc.addEventListener("change", (ev) => {
     if (ev.target && ev.target.dataset && ev.target.dataset.x === "importer") importer(ev.target.files && ev.target.files[0]);
@@ -983,5 +1235,5 @@
   }
   charger();
 
-  racine.Express = { charger, vider, _etat: () => etat, _file: () => lireLocal(CLE_FILE, []) };
+  racine.Express = { charger, vider, _etat: () => etat, _file: () => lireLocal(CLE_FILE, []), agir, fermerFeuilles };
 })(window);
