@@ -1,0 +1,24 @@
+{
+  "name": "Jeu de quêtes",
+  "short_name": "Quêtes",
+  "description": "Tes quêtes du jour, cochées en deux secondes. La partie vit sur ton téléphone, même hors ligne. Un fichier d'export te sert de sauvegarde.",
+  "lang": "fr",
+  "dir": "ltr",
+  "id": "./",
+  "start_url": "./express.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1D2A44",
+  "theme_color": "#1D2A44",
+  "categories": ["productivity", "games"],
+  "shortcuts": [
+    { "name": "Quêtes du jour", "short_name": "Express", "url": "./express.html" },
+    { "name": "L'immeuble", "short_name": "Immeuble", "url": "./" }
+  ],
+  "icons": [
+    { "src": "icones/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icones/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icones/icone-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1D2A44">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Quêtes">
+<title>Jeu de quêtes</title>
+<link rel="icon" href="favicon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="jeu">
+  <div id="cadre"><canvas id="scene" aria-label="Ton immeuble en coupe : tes agents y travaillent."></canvas></div>
+
+  <header id="barre" class="cadre-pixel">
+    <button type="button" id="bloc-lieu" class="bloc" data-action="panneau" data-panneau="carte" title="Voir la carte des lieux">
+      <span class="pix" data-sprite="icone-immeuble" data-z="3"></span>
+      <span class="colonne"><span id="nom-lieu" class="titre-pixel"></span><span id="sous-lieu" class="petit"></span></span>
+    </button>
+    <button type="button" id="bloc-argent" class="bloc" data-action="panneau" data-panneau="encaissements" title="Déclarer un encaissement">
+      <span class="ligne">
+        <span id="argent-titre" class="petit"></span>
+        <span id="argent-total" class="titre-pixel"></span>
+        <span id="argent-reste" class="petit"></span>
+      </span>
+      <span id="jauge" class="jauge" role="progressbar" aria-valuemin="0">
+        <span id="jauge-pleine" class="jauge-pleine"></span>
+        <span id="jauge-jalons"></span>
+      </span>
+    </button>
+    <button type="button" id="bloc-equipe" class="bloc" data-action="panneau" data-panneau="equipe" title="Le but d'équipe de la semaine">
+      <span class="pix" data-sprite="icone-equipe" data-z="3"></span>
+      <span class="colonne"><span id="equipe-titre" class="petit"></span><span id="equipe-crans"></span></span>
+    </button>
+    <button type="button" id="bloc-systeme" class="bloc" data-action="panneau" data-panneau="systeme" hidden></button>
+    <div id="bloc-points" class="bloc" aria-live="polite">
+      <span class="pix" id="piece-compteur" data-sprite="icone-points" data-z="3"></span>
+      <span class="colonne"><span id="points" class="titre-pixel"></span><span id="niveau" class="petit"></span><span id="niveau-jauge" class="jauge-niveau"><i></i></span></span>
+    </div>
+    <div class="bloc outils">
+      <button type="button" class="bouton-icone" id="bouton-reglages" data-action="reglages" title="Réglages : tout se change ici"><span class="pix" data-sprite="icone-reglages" data-z="2"></span></button>
+      <button type="button" class="bouton-icone" id="bouton-son" data-action="son" title="Son coupé. Clique pour l'activer."><span class="pix" data-sprite="icone-muet" data-z="2"></span></button>
+      <button type="button" class="bouton-icone" id="bouton-mixage" data-action="mixage" aria-haspopup="dialog" aria-expanded="false" title="Musique et volumes"><span class="pix" data-sprite="icone-musique" data-z="2"></span></button>
+      <a class="bouton-icone lien-express" id="bouton-express" href="express.html" title="Mode express : cocher tes quêtes du jour en deux secondes">Express</a>
+      <button type="button" class="bouton-icone" id="bouton-rafraichir" data-action="rafraichir" title="Relire tes quêtes"><span class="pix" data-sprite="icone-rafraichir" data-z="2"></span></button>
+      <span id="heure-maj" class="petit"></span>
+    </div>
+  </header>
+
+  <nav id="dock" aria-label="Panneaux">
+    <button type="button" class="onglet" data-action="panneau" data-panneau="quetes" title="Quêtes"><span class="pix" data-sprite="icone-quetes" data-z="3"></span><span class="nom-onglet">Quêtes</span></button>
+    <button type="button" class="onglet" data-action="panneau" data-panneau="systeme" title="Le Système : niveau, rang, rituels, donjons"><span class="pix" data-sprite="icone-systeme" data-z="3"></span><span class="nom-onglet">Système</span></button>
+    <button type="button" class="onglet" data-action="panneau" data-panneau="journal" title="Journal de l'immeuble"><span class="pix" data-sprite="icone-journal" data-z="3"></span><span class="nom-onglet">Journal</span></button>
+    <button type="button" class="onglet" data-action="panneau" data-panneau="equipe" title="L'équipe et son but"><span class="pix" data-sprite="icone-equipe" data-z="3"></span><span class="nom-onglet">Équipe</span></button>
+    <button type="button" class="onglet" data-action="panneau" data-panneau="encaissements" title="Encaissements"><span class="pix" data-sprite="icone-argent" data-z="3"></span><span class="nom-onglet">Argent</span></button>
+    <button type="button" class="onglet" data-action="panneau" data-panneau="boutique" title="Boutique"><span class="pix" data-sprite="icone-boutique" data-z="3"></span><span class="nom-onglet">Boutique</span></button>
+    <button type="button" class="onglet" data-action="panneau" data-panneau="ranger" title="Ranger mon bureau"><span class="pix" data-sprite="icone-ranger" data-z="3"></span><span class="nom-onglet">Ranger</span></button>
+    <button type="button" class="onglet" data-action="panneau" data-panneau="carte" title="Carte des caps"><span class="pix" data-sprite="icone-carte" data-z="3"></span><span class="nom-onglet">Carte</span></button>
+    <button type="button" class="onglet" data-action="panneau" data-panneau="etat" title="Comment je me sens ?"><span class="pix" data-sprite="icone-etat" data-z="3"></span><span class="nom-onglet">État</span></button>
+    <button type="button" class="onglet" data-action="panneau" data-panneau="trophees" title="Collection et badges"><span class="pix" data-sprite="icone-trophees" data-z="3"></span><span class="nom-onglet">Collection</span></button>
+  </nav>
+
+  <div id="camera" aria-label="Vue">
+    <button type="button" class="bouton-icone" data-action="zoom" data-sens="1" title="Zoomer"><span class="pix" data-sprite="icone-plus" data-z="2"></span></button>
+    <button type="button" class="bouton-icone" data-action="zoom" data-sens="-1" title="Dézoomer"><span class="pix" data-sprite="icone-moins" data-z="2"></span></button>
+    <button type="button" class="bouton-texte" data-action="vue" data-vue="lieu">Mon bureau</button>
+    <button type="button" class="bouton-texte" data-action="vue" data-vue="immeuble">Tout l'immeuble</button>
+  </div>
+
+  <aside id="panneau" class="cadre-pixel" aria-label="Panneau">
+    <div class="tete">
+      <span id="titre-panneau" class="titre-pixel"></span>
+      <button type="button" class="bouton-icone" data-action="fermer-panneau" title="Fermer le panneau (Échap)"><span class="croix">x</span></button>
+    </div>
+    <div id="contenu" tabindex="-1"></div>
+  </aside>
+
+  <div id="mobile" aria-label="Ta journée"></div>
+
+  <div id="bandeaux"></div>
+  <div id="annonces" aria-live="polite"></div>
+  <div id="infobulle" role="tooltip"></div>
+  <div id="titre-evenement"></div>
+  <div id="premiere" hidden></div>
+  <div id="deblocage" hidden></div>
+  <div id="demo-tour" hidden></div>
+  <div id="modale" hidden></div>
+  <footer id="pied" class="petit"></footer>
+</div>
+<script src="haptique.js"></script>
+<script src="moteur.js"></script>
+<script src="api-local.js"></script>
+<script src="palette.js"></script>
+<script src="police.js"></script>
+<script src="personnages.js"></script>
+<script src="meubles.js"></script>
+<script src="objets.js"></script>
+<script src="chemin.js"></script>
+<script src="monde.js"></script>
+<script src="decor.js"></script>
+<script src="ciel.js"></script>
+<script src="immeuble.js"></script>
+<script src="agents.js"></script>
+<script src="rendu.js"></script>
+<script src="son.js"></script>
+<script src="musique.js"></script>
+<script src="mixage.js"></script>
+<script src="panneaux.js"></script>
+<script src="v3.js"></script>
+<script src="systeme.js"></script>
+<script src="mobile.js"></script>
+<script src="app.js"></script>
+<script src="tour.js"></script>
+<script src="pwa.js"></script>
+</body>
+</html>
